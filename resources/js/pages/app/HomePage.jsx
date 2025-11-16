@@ -6,6 +6,7 @@ import { ListTodo, BarChart3, CheckCircle2 } from "lucide-react";
 
 export default function HomePage() {
   const { auth } = usePage().props;
+  const userName = auth?.user?.name || "User";
 
   return (
     <AppLayout>
@@ -19,7 +20,7 @@ export default function HomePage() {
                   __html: "&#128075;",
                 }}
               />
-              Hai! {auth.name}
+              Hai! {userName}
             </h1>
             <p className="text-xl text-muted-foreground mb-6">
               Apa yang ingin kamu lakukan hari ini?

@@ -20,16 +20,34 @@ import {
   Image as ImageIcon,
   Filter,
 } from "lucide-react";
-import Swal from "sweetalert2";
+
+// Import SweetAlert2 - pastikan sudah install: npm install sweetalert2
+let Swal;
+if (typeof window !== 'undefined') {
+  import('sweetalert2').then(module => {
+    Swal = module.default;
+  });
+}
 
 export default function TodoPage() {
-  const { todos, stats, filters, flash } = usePage().props;
+  const pageProps = usePage().props;
+  const todos = pageProps.todos || { data: [], links: [] };
+  const stats = pageProps.stats || { total: 0, finished: 0, unfinished: 0 };
+  const filters = pageProps.filters || { search: "", filter: "all" };
+  const flash = pageProps.flash || {};
+  
   const [search, setSearch] = useState(filters.search || "");
   const [filter, setFilter] = useState(filters.filter || "all");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    cover: null,
+  });
 
   // SweetAlert untuk flash message
   useEffect(() => {
-    if (flash?.success) {
+    if (flash?.success && Swal) {
       Swal.fire({
         icon: "success",
         title: "Berhasil!",
@@ -51,6 +69,11 @@ export default function TodoPage() {
   };
 
   const handleToggleFinish = (id) => {
+    if (!Swal) {
+      router.post(`/todos/${id}/toggle`);
+      return;
+    }
+
     Swal.fire({
       title: "Ubah Status?",
       text: "Apakah Anda yakin ingin mengubah status todo ini?",
@@ -66,6 +89,13 @@ export default function TodoPage() {
   };
 
   const handleDelete = (id) => {
+    if (!Swal) {
+      if (confirm('Apakah Anda yakin ingin menghapus todo ini?')) {
+        router.delete(`/todos/${id}`);
+      }
+      return;
+    }
+
     Swal.fire({
       title: "Hapus Todo?",
       text: "Data yang dihapus tidak dapat dikembalikan!",
@@ -81,13 +111,6 @@ export default function TodoPage() {
       }
     });
   };
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    cover: null,
-  });
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -126,7 +149,7 @@ export default function TodoPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="text-2xl font-bold">{stats?.total || 0}</div>
             </CardContent>
           </Card>
           <Card>
@@ -135,7 +158,7 @@ export default function TodoPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {stats.finished}
+                {stats?.finished || 0}
               </div>
             </CardContent>
           </Card>
@@ -147,7 +170,7 @@ export default function TodoPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-600">
-                {stats.unfinished}
+                {stats?.unfinished || 0}
               </div>
             </CardContent>
           </Card>
@@ -172,18 +195,21 @@ export default function TodoPage() {
             <Button
               variant={filter === "all" ? "default" : "outline"}
               onClick={() => handleFilterChange("all")}
+              size="sm"
             >
               Semua
             </Button>
             <Button
               variant={filter === "finished" ? "default" : "outline"}
               onClick={() => handleFilterChange("finished")}
+              size="sm"
             >
               Selesai
             </Button>
             <Button
               variant={filter === "unfinished" ? "default" : "outline"}
               onClick={() => handleFilterChange("unfinished")}
+              size="sm"
             >
               Belum Selesai
             </Button>
@@ -196,68 +222,79 @@ export default function TodoPage() {
         </div>
 
         {/* Todo List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          {todos.data.map((todo) => (
-            <Card key={todo.id} className="overflow-hidden">
-              {todo.cover && (
-                <img
-                  src={`/storage/${todo.cover}`}
-                  alt={todo.title}
-                  className="w-full h-48 object-cover"
-                />
-              )}
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span className={todo.is_finished ? "line-through" : ""}>
-                    {todo.title}
-                  </span>
-                  {todo.is_finished ? (
-                    <span className="text-green-600">
-                      <Check className="h-5 w-5" />
+        {todos?.data && todos.data.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {todos.data.map((todo) => (
+              <Card key={todo.id} className="overflow-hidden">
+                {todo.cover && (
+                  <img
+                    src={`/storage/${todo.cover}`}
+                    alt={todo.title}
+                    className="w-full h-48 object-cover"
+                  />
+                )}
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className={todo.is_finished ? "line-through" : ""}>
+                      {todo.title}
                     </span>
-                  ) : (
-                    <span className="text-orange-600">
-                      <X className="h-5 w-5" />
-                    </span>
-                  )}
-                </CardTitle>
-                <CardDescription className="line-clamp-2">
-                  {todo.description || "Tidak ada deskripsi"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleToggleFinish(todo.id)}
-                >
-                  {todo.is_finished ? "Belum Selesai" : "Selesai"}
-                </Button>
-                <Link href={`/todos/${todo.id}/edit`}>
-                  <Button size="sm" variant="outline">
-                    <Edit className="h-4 w-4" />
+                    {todo.is_finished ? (
+                      <span className="text-green-600">
+                        <Check className="h-5 w-5" />
+                      </span>
+                    ) : (
+                      <span className="text-orange-600">
+                        <X className="h-5 w-5" />
+                      </span>
+                    )}
+                  </CardTitle>
+                  <CardDescription className="line-clamp-2">
+                    {todo.description || "Tidak ada deskripsi"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleToggleFinish(todo.id)}
+                  >
+                    {todo.is_finished ? "Belum Selesai" : "Selesai"}
                   </Button>
-                </Link>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleDelete(todo.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <Link href={`/todos/${todo.id}/edit`}>
+                    <Button size="sm" variant="outline">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDelete(todo.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground mb-4">Belum ada todo</p>
+            <Button onClick={() => setShowAddModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Buat Todo Pertama
+            </Button>
+          </div>
+        )}
 
         {/* Pagination */}
-        {todos.links && (
-          <div className="flex justify-center gap-2">
+        {todos?.links && todos.links.length > 3 && (
+          <div className="flex justify-center gap-2 flex-wrap">
             {todos.links.map((link, index) => (
               <Button
                 key={index}
                 variant={link.active ? "default" : "outline"}
                 disabled={!link.url}
+                size="sm"
                 onClick={() =>
                   link.url &&
                   router.get(link.url, { search, filter }, { preserveState: true })
@@ -279,7 +316,7 @@ export default function TodoPage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Judul
+                      Judul <span className="text-red-600">*</span>
                     </label>
                     <Input
                       required
@@ -287,6 +324,7 @@ export default function TodoPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, title: e.target.value })
                       }
+                      placeholder="Masukkan judul todo"
                     />
                   </div>
                   <div>
@@ -300,6 +338,7 @@ export default function TodoPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, description: e.target.value })
                       }
+                      placeholder="Deskripsi todo (opsional)"
                     />
                   </div>
                   <div>
@@ -313,6 +352,11 @@ export default function TodoPage() {
                         setFormData({ ...formData, cover: e.target.files[0] })
                       }
                     />
+                    {formData.cover && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {formData.cover.name}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
@@ -321,7 +365,10 @@ export default function TodoPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setShowAddModal(false)}
+                      onClick={() => {
+                        setShowAddModal(false);
+                        setFormData({ title: "", description: "", cover: null });
+                      }}
                     >
                       Batal
                     </Button>

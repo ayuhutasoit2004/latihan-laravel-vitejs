@@ -13,9 +13,26 @@ import { ArrowLeft, Upload, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 
 export default function TodoEditPage() {
-  const { todo } = usePage().props;
+  const pageProps = usePage().props;
+  const todo = pageProps.todo;
+  
+  if (!todo) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-2xl mx-auto text-center">
+            <h1 className="text-2xl font-bold mb-4">Todo tidak ditemukan</h1>
+            <Link href="/todos">
+              <Button>Kembali ke Todos</Button>
+            </Link>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+  
   const [formData, setFormData] = useState({
-    title: todo.title,
+    title: todo.title || "",
     description: todo.description || "",
   });
   const [coverFile, setCoverFile] = useState(null);
